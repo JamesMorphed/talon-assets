@@ -1074,12 +1074,21 @@ function __talonLib() {
       el, scene, camera, target: c, dist: (radius / Math.sin((30 * Math.PI) / 360)) * 0.78,
       yaw: parseFloat(el.getAttribute('data-yaw') || '0.62'), pitch: 0.36, drag: null, idle: 0
     };
+    v.clip = el.closest('[data-vignette-clip]');
+    const mouseOnly = el.getAttribute('data-drag') === 'mouse';
+    if (mouseOnly) el.style.touchAction = 'auto';
+    let moved = 0;
+    el.addEventListener('click', (e) => { if (moved > 6) { e.preventDefault(); e.stopPropagation(); } moved = 0; }, true);
+    el.addEventListener('dragstart', (e) => e.preventDefault());
     el.addEventListener('pointerdown', (e) => {
+      if (mouseOnly && e.pointerType !== 'mouse') return;
+      moved = 0;
       v.drag = { x: e.clientX, y: e.clientY, id: e.pointerId };
       try { el.setPointerCapture(e.pointerId); } catch (_) {}
     });
     el.addEventListener('pointermove', (e) => {
       if (!v.drag || v.drag.id !== e.pointerId) return;
+      moved += Math.abs(e.clientX - v.drag.x) + Math.abs(e.clientY - v.drag.y);
       v.yaw -= (e.clientX - v.drag.x) * 0.008;
       if (e.pointerType === 'mouse') v.pitch = Math.min(1.15, Math.max(0.06, v.pitch + (e.clientY - v.drag.y) * 0.005));
       v.drag.x = e.clientX; v.drag.y = e.clientY;
@@ -1120,10 +1129,12 @@ function __talonLib() {
         v.target.z + v.dist * cp * Math.cos(v.yaw));
       v.camera.lookAt(v.target);
       v.camera.aspect = r.width / r.height; v.camera.updateProjectionMatrix();
-      const ct = Math.max(r.top, top), ch = r.bottom - ct;
-      if (ch <= 1) return;
+      let cl = 0, cr = W, ct = top, cb = H;
+      if (v.clip) { const c = v.clip.getBoundingClientRect(); cl = Math.max(cl, c.left); cr = Math.min(cr, c.right); ct = Math.max(ct, c.top); cb = Math.min(cb, c.bottom); }
+      const sl = Math.max(r.left, cl), sr = Math.min(r.right, cr), st = Math.max(r.top, ct), sb = Math.min(r.bottom, cb);
+      if (sr - sl <= 1 || sb - st <= 1) return;
       renderer.setViewport(r.left, H - r.bottom, r.width, r.height);
-      renderer.setScissor(r.left, H - r.bottom, r.width, ch);
+      renderer.setScissor(sl, H - sb, sr - sl, sb - st);
       renderer.render(v.scene, v.camera);
     });
     requestAnimationFrame(frame);
@@ -1153,7 +1164,7 @@ function __talonLib() {
   window.TalonVignettes = { mountAll, scenes: Object.keys(SCENES) };
 }
 
-/* Talon Vignettes v1.0.0 | blueprint service models | Morphed Studio */
+/* Talon Vignettes v1.0.1 | blueprint service models | Morphed Studio */
 (function () {
   var els = document.querySelectorAll('.talon-vignette');
   if (!els.length) return;
