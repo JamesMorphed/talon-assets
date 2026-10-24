@@ -1164,7 +1164,7 @@ function __talonLib() {
   window.TalonVignettes = { mountAll, scenes: Object.keys(SCENES) };
 }
 
-/* Talon Vignettes v1.0.1 | blueprint service models | Morphed Studio */
+/* Talon Vignettes v1.0.2 | blueprint service models | Morphed Studio */
 (function () {
   var els = document.querySelectorAll('.talon-vignette');
   if (!els.length) return;
@@ -1172,9 +1172,14 @@ function __talonLib() {
   style.textContent = '.talon-vignette{position:relative;aspect-ratio:4/3;max-width:100%;cursor:grab;touch-action:pan-y}.talon-vignette:active{cursor:grabbing}';
   document.head.appendChild(style);
   function go() { __talonLib(); window.TalonVignettes && window.TalonVignettes.mountAll(); }
+  // Share one three.js with the hero: a second copy would replace window.THREE and drop OrbitControls.
+  if (window.__talonThreeP) { window.__talonThreeP.then(go, function () { if (window.THREE) go(); }); return; }
   if (window.THREE && window.THREE.InstancedMesh) return go();
-  var s = document.createElement('script');
-  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
-  s.async = true; s.onload = go;
-  document.head.appendChild(s);
+  window.__talonThreeP = new Promise(function (res, rej) {
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/gh/JamesMorphed/talon-assets@07440997fd002469b974099ccb5c777a6a0fd8b2/vendor/three.r128.min.js';
+    s.async = true; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+  window.__talonThreeP.then(go, function () {});
 })();
