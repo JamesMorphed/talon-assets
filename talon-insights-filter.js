@@ -1,5 +1,5 @@
-/* Talon Insights catalogue v1.1.0
-   Brand filter (tabs + mobile dropdown), 12-per-page pagination, article count,
+/* Talon Insights catalogue v1.2.0
+   Brand filter (tabs + mobile dropdown), 12-per-page pagination (slider-style arrows), article count,
    empty state, ?brand= and ?page= deep links. Brand is read from a hidden .in-slug
    element bound to the CMS Brand slug (the Brand reference cannot bind to attributes). */
 (function () {
@@ -10,7 +10,7 @@
   var PER_PAGE = 12;
 
   var css =
-    '.in-grid .w-dyn-list,.in-grid .w-dyn-items,.in-feature .w-dyn-list,.in-feature .w-dyn-items{display:contents}' +
+    '.in-feature .w-dyn-list,.in-feature .w-dyn-items{display:contents}' +
     '.in-grid .w-dyn-empty,.in-feature .w-dyn-empty{display:none}' +
     '.in-grid .w-dyn-item{min-width:0}' +
     '[data-brand=scaffolding]{--in-b:#ff5a5f}' +
@@ -37,12 +37,10 @@
     '.in-menu-item{display:flex;align-items:center;gap:10px;padding:12px;border-radius:6px;cursor:pointer;color:var(--_v2-theme---v2-ink,#e6ebf2)}' +
     '.in-menu-item:hover,.in-menu-item:focus-visible,.in-menu-item.is-active{background:rgba(230,235,242,.1)}' +
     '.in-empty{grid-column:1/-1;padding:64px 0;text-align:center;opacity:.7}' +
-    '.in-pg{min-width:44px;height:44px;padding:0 14px;display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(230,235,242,.2);border-radius:999px;background:transparent;color:var(--_v2-theme---v2-ink,#e6ebf2);font:inherit;font-size:14px;cursor:pointer;transition:background-color .3s,color .3s,opacity .3s}' +
-    '.in-pg:hover,.in-pg:focus-visible{background:rgba(230,235,242,.12)}' +
-    '.in-pg.is-active{background:var(--_v2-theme---v2-ink,#e6ebf2);color:var(--_v2-theme---v2-bg,#0b0f14);border-color:transparent}' +
-    '.in-pg[disabled]{opacity:.3;pointer-events:none}' +
-    '.in-pg-gap{opacity:.5;padding:0 4px}' +
-    '@media (max-width:767px){.in-catalog .sv-select{display:flex}.in-catalog .sv-tabs{display:none}.in-pg{min-width:40px;height:40px;padding:0 12px}}' +
+    '.in-catalog [data-pager]{justify-content:center;margin-top:72px}' +
+    '.in-catalog [data-pager] .sv-btn{cursor:pointer;transition:opacity .3s}' +
+    '.in-catalog [data-pager] .sv-btn[aria-disabled=true]{opacity:.3;pointer-events:none}' +
+    '@media (max-width:767px){.in-catalog .sv-select{display:flex}.in-catalog .sv-tabs{display:none}.in-catalog [data-pager]{margin-top:48px}}' +
     '@media (prefers-reduced-motion:reduce){.in-grid .hv-ins-img,.in-feat-img,.in-grid .hv-ins-title,.in-feat-title,.in-feat-cta{transition:none}}';
   var st = document.createElement('style');
   st.textContent = css;
@@ -104,49 +102,24 @@
     select.setAttribute('aria-expanded', on ? 'true' : 'false');
   }
 
-  /* Pager lives straight after the grid */
-  var pager = document.createElement('nav');
-  pager.className = 'in-pager';
-  pager.setAttribute('aria-label', 'Insights pages');
-  grid.parentNode.insertBefore(pager, grid.nextSibling);
-
-  function btn(text, page, opts) {
-    var b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'in-pg' + (opts && opts.active ? ' is-active' : '');
-    b.textContent = text;
-    if (opts && opts.label) b.setAttribute('aria-label', opts.label);
-    if (opts && opts.active) b.setAttribute('aria-current', 'page');
-    if (opts && opts.disabled) b.disabled = true;
-    else b.addEventListener('click', function () { go(page, true); });
-    return b;
-  }
-  function pageList(cur, total) {
-    var out = [], i;
-    var near = [1, total, cur - 1, cur, cur + 1].filter(function (n) { return n >= 1 && n <= total; });
-    near = near.filter(function (n, k) { return near.indexOf(n) === k; }).sort(function (a, b) { return a - b; });
-    for (i = 0; i < near.length; i++) {
-      if (i && near[i] - near[i - 1] > 1) out.push(0);
-      out.push(near[i]);
-    }
-    return out;
+  /* Pager: static slider-style controls (sv-btn arrows + sv-count) */
+  var pager = root.querySelector('[data-pager]');
+  var prevB = pager && pager.querySelector('.sv-prev');
+  var nextB = pager && pager.querySelector('.sv-next');
+  var pageCount = pager && pager.querySelector('.sv-count');
+  var listEl = grid.querySelector('.w-dyn-items') || grid;
+  function setCount(txt) {
+    if (!pageCount) return;
+    var t = pageCount.firstChild;
+    while (t && t.nodeType !== 3) t = t.nextSibling;
+    if (t) t.nodeValue = txt; else pageCount.textContent = txt;
   }
   function renderPager(total) {
-    pager.innerHTML = '';
-    if (total <= 1) { pager.style.display = 'none'; return; }
-    pager.style.display = '';
-    pager.appendChild(btn('Previous', state.p - 1, { disabled: state.p === 1, label: 'Previous page' }));
-    pageList(state.p, total).forEach(function (n) {
-      if (!n) {
-        var g = document.createElement('span');
-        g.className = 'in-pg-gap';
-        g.textContent = '…';
-        pager.appendChild(g);
-      } else {
-        pager.appendChild(btn(String(n), n, { active: n === state.p, label: 'Page ' + n }));
-      }
-    });
-    pager.appendChild(btn('Next', state.p + 1, { disabled: state.p === total, label: 'Next page' }));
+    if (!pager) return;
+    pager.style.display = total <= 1 ? 'none' : '';
+    setCount(pad(state.p) + ' / ' + pad(total));
+    if (prevB) prevB.setAttribute('aria-disabled', state.p <= 1 ? 'true' : 'false');
+    if (nextB) nextB.setAttribute('aria-disabled', state.p >= total ? 'true' : 'false');
   }
 
   function writeUrl() {
@@ -194,17 +167,18 @@
     }
     if (count) count.textContent = pad(match.length) + (match.length === 1 ? ' article' : ' articles');
 
-    var empty = grid.querySelector('.in-empty');
+    var empty = listEl.querySelector('.in-empty');
     if (match.length === 0) {
       if (!empty) {
         empty = document.createElement('div');
         empty.className = 'in-empty';
         empty.textContent = 'No articles in this category yet. Check back soon.';
-        grid.appendChild(empty);
+        listEl.appendChild(empty);
       }
     } else if (empty) {
       empty.parentNode.removeChild(empty);
     }
+    lastTotal = total;
     renderPager(match.length ? total : 0);
   }
 
@@ -246,6 +220,10 @@
       if (e.key === 'Escape') openMenu(false);
     });
   }
+
+  var lastTotal = 1;
+  if (prevB) key(prevB, function () { if (state.p > 1) go(state.p - 1, true); });
+  if (nextB) key(nextB, function () { if (state.p < lastTotal) go(state.p + 1, true); });
 
   try {
     var q = new URLSearchParams(location.search);
